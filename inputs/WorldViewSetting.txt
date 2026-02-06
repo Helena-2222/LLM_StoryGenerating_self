@@ -1,0 +1,6 @@
+ [World View Name] Harry Potter: The Eve of the Battle at Hogwarts
+ [Time] In 1997, Voldemort's forces infiltrated the Ministry of Magic, and Hogwarts was shrouded in shadow. 
+ [Location] Hogwarts School of Witchcraft and Wizardry, UK, Forbidden Forest. 
+ [Physical Environment] Magical energy exists, and spells are cast through wands. The location includes moving stairs, secret rooms and protective barriers. 
+ [Social Environment] Pure bloodline supremacy is on the rise, and the Ministry of Magic is in a semi-paralyzed state.
+ [Core Rule] It is prohibited to use unforgivable spells on people. Minors are prohibited from performing spells outside school.
