@@ -53,15 +53,29 @@ class Actor:
         with open(self.prompt_path, "r", encoding="utf-8") as f:
             return f.read()
 
+    # preprocess/Character_preprocess.py 核心修改部分
+
     async def act(self, world_context: str, history: str, director_guidance: str = ""):
-        """
-        角色根据世界现状、往事记忆和导演指引进行表演
-        """
-        full_system_prompt = f"{self.base_prompt}\n\n# 你的角色设定：\n{self.profile.json()}"
+        # 强制要求剧本格式和字数控制
+        format_instruction = (
+            f"### 你的身份：{self.profile.name}\n"
+            f"### 表演格式要求：\n"
+            f"1. 必须严格遵守剧本格式：角色名【行动描述】：对话内容\n"
+            f"2. 每次台词长度控制在 20 个字以内，简洁有力。\n"
+            f"3. 严禁输出内心独白、心理描写或状态数值。\n"
+            f"4. 你的行动要符合性格设定：{self.profile.personality}\n"
+        )
         
-        user_input = f"【世界现状】：{world_context}\n【近期往事】：{history}"
+        full_system_prompt = f"{self.base_prompt}\n\n{format_instruction}\n# 详细设定：\n{self.profile.json()}"
+        
+        user_input = (
+            f"【世界背景】：{world_context}\n"
+            f"【前情提要/已发生的对话】：\n{history}\n"
+            f"请根据以上信息，接续写下 {self.profile.name} 的一次行动和一句台词："
+        )
+        
         if director_guidance:
-            user_input += f"\n【导演紧急指令】：{director_guidance}"
+            user_input += f"\n【导演指令】：{director_guidance}"
 
         messages = [
             {"role": "system", "content": full_system_prompt},

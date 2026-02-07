@@ -40,58 +40,78 @@ async def main():
     with open("inputs/WorldViewSetting.txt", "r", encoding="utf-8") as f:
         world_data = preprocess_worldview(f.read(), llm)
     
-    with open("inputs/CharacterSetting.txt", "r", encoding="utf-8") as f:
-        char_raw = f.read()
-        # 简单起见，这里假设你的 preprocess 返回一个 Actor 列表
-        # 如果你之前只处理单人，这里需要稍微修改逻辑来循环处理
-        char_profile = preprocess_character(char_raw, llm) 
-        actor = Actor(llm, char_profile) # 先以哈利为例跑通
+    actors = []
+    char_dir = "inputs/characters"
+    for filename in os.listdir(char_dir):
+        if filename.endswith(".txt"):
+            with open(os.path.join(char_dir, filename), "r", encoding="utf-8") as f:
+                profile = preprocess_character(f.read(), llm)
+                actors.append(Actor(llm, profile))
 
     # 3. 初始化导演
     director = Director(llm)
 
     # 4. 生成剧情循环
     with open("inputs/HistorySetting.txt", "r", encoding="utf-8") as f:
-        init = f.read()
+        history = f.read()
 
     with open("inputs/SeriesTitle.txt", "r", encoding="utf-8") as f:
         title = f.read()
     
     current_ep=1
     max_ep=3
+    max_retries = 3  # 最大重试次数
 
-    print(f"🚀 开始生成第1集剧本...")
     
-    # 模拟角色行动
-    action_resp = await actor.act(str(world_data), init)
-    draft_script = action_resp.content
-    
-    # 导演审核
-    review_result = await director.review(draft_script, 1)
+    # 5. 生成剧情循环
+    for episode_num in range(current_ep, max_ep + 1):
+        print(f"\n{'='*20} 🎬 开始制作 第 {episode_num} 集 {'='*20}")
         
-    if "PASS" in review_result.upper():
-        save_final_script(1, draft_script, title)
-    else:
-        print(f"❌ 导演要求重写：{review_result}")
-        # 这里可以加入重试逻辑
-
-    history = init + "\n" + draft_script
-    for episode_num in range(current_ep+1, max_ep + 1):
-        print(f"🚀 开始生成第{episode_num}集剧本...")
-    
-        # 模拟角色行动
-        action_resp = await actor.act(str(world_data), history)
-        draft_script = action_resp.content
-
-        # 导演审核
-        review_result = await director.review(draft_script, episode_num)
+        success = False
+        retry_count = 0
+        current_guidance = "" # 初始导演指引为空
         
-        if "PASS" in review_result.upper():
-            save_final_script(episode_num, draft_script, title)
-        else:
-            print(f"❌ 导演要求重写：{review_result}")
-            # 这里可以加入重试逻辑
-        history += "\n" + draft_script
+        while not success and retry_count < max_retries:
+            if retry_count > 0:
+                print(f"🔄 正在进行第 {retry_count} 次重写尝试...")
+
+            episode_script = ""  # 本集累计剧本
+            target_length = 800  # 目标字数
+            
+            # --- 演员接龙表演逻辑 ---
+            while len(episode_script) < target_length:
+                for actor in actors:
+                    # 传入历史、当前集已写内容，以及导演的修改建议
+                    action_resp = await actor.act(
+                        world_context=str(world_data), 
+                        history=history + "\n" + episode_script,
+                        director_guidance=current_guidance
+                    )
+                    content = action_resp.content.strip()
+                    episode_script += content + "\n\n"
+                    
+                    if len(episode_script) >= target_length:
+                        break
+            
+            # --- 导演审核逻辑 ---
+            print(f"🧐 剧本生成完毕（约{len(episode_script)}字），提交导演审核...")
+            review_result = await director.review(episode_script, episode_num)
+            
+            if "PASS" in review_result.upper():
+                print(f"✅ 第 {episode_num} 集审核通过！已保存。")
+                save_final_script(episode_num, episode_script, title)
+                history += f"\n--- 第 {episode_num} 集回顾 ---\n{episode_script}" # 更新长久记忆
+                success = True
+            else:
+                retry_count += 1
+                current_guidance = review_result # 将导演的批评作为下一轮的指令
+                print(f"❌ 审核未通过 (尝试 {retry_count}/{max_retries})")
+                print(f"📢 导演反馈：{review_result[:100]}...") # 打印简略反馈
+
+        if not success:
+            print(f"⚠️ 警告：第 {episode_num} 集在 {max_retries} 次重试后仍未通过，自动进入下一集。")
+
+    print("\n🏁 剧本创作任务完成！")
 
 if __name__ == "__main__":
     asyncio.run(main())
