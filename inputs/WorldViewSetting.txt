@@ -1,6 +1,7 @@
- [World View Name] Harry Potter: The Eve of the Battle at Hogwarts
- [Time] In 1997, Voldemort's forces infiltrated the Ministry of Magic, and Hogwarts was shrouded in shadow. 
- [Location] Hogwarts School of Witchcraft and Wizardry, UK, Forbidden Forest. 
- [Physical Environment] Magical energy exists, and spells are cast through wands. The location includes moving stairs, secret rooms and protective barriers. 
- [Social Environment] Pure bloodline supremacy is on the rise, and the Ministry of Magic is in a semi-paralyzed state.
- [Core Rule] It is prohibited to use unforgivable spells on people. Minors are prohibited from performing spells outside school.
+#世界观提示词放这里
+【世界观名称】哈利波特：霍格沃茨之战前夕
+【时间】1997年，伏地魔势力渗透魔法部，霍格沃茨笼罩在阴影下。
+【地点】英国霍格沃茨魔法学校，禁林。
+【物理环境】存在魔法能量，通过魔杖施法。地点包含会移动的楼梯、密室、保护屏障。
+【社会环境】纯血统至上主义抬头，魔法部处于半瘫痪状态。
+【核心规则】禁止对人使用不可饶恕咒；未成年人禁止在校外施法。
