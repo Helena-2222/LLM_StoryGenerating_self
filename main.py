@@ -37,11 +37,11 @@ async def main():
     )
 
     # 2. 预处理数据
-    with open("inputs/WorldViewSetting.txt", "r", encoding="utf-8") as f:
+    with open("inputs/Science_Fiction/WorldViewSetting.txt", "r", encoding="utf-8") as f:
         world_data = preprocess_worldview(f.read(), llm)
     
     actors = []
-    char_dir = "inputs/characters"
+    char_dir = "inputs/Science_Fiction/characters"
     for filename in os.listdir(char_dir):
         if filename.endswith(".txt"):
             with open(os.path.join(char_dir, filename), "r", encoding="utf-8") as f:
@@ -52,15 +52,15 @@ async def main():
     director = Director(llm)
 
     # 4. 生成剧情循环
-    with open("inputs/HistorySetting.txt", "r", encoding="utf-8") as f:
+    with open("inputs/Science_Fiction/HistorySetting.txt", "r", encoding="utf-8") as f:
         history = f.read()
 
-    with open("inputs/SeriesTitle.txt", "r", encoding="utf-8") as f:
+    with open("inputs/Science_Fiction/SeriesTitle.txt", "r", encoding="utf-8") as f:
         title = f.read()
     
     current_ep=1
     max_ep=3
-    max_retries = 3  # 最大重试次数
+    max_retries = 1  # 最大重试次数
 
     
     # 5. 生成剧情循环
@@ -110,8 +110,13 @@ async def main():
 
         if not success:
             print(f"⚠️ 警告：第 {episode_num} 集在 {max_retries} 次重试后仍未通过，自动进入下一集。")
+            #save_final_script(episode_num, episode_script, title)
+            #history += f"\n--- 第 {episode_num} 集回顾 ---\n{episode_script}" # 更新长久记忆
 
     print("\n🏁 剧本创作任务完成！")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass

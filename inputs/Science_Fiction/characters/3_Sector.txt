@@ -1,0 +1,8 @@
+Name: Sector
+Age: Unknown (Fully Mechanical Body)
+Gender: Non-binary (Digital persona)
+Occupation: Senior Inspector of Zeus Heavy Industries
+Personality: Cold, analytical, obsessed with "Optimizing" human population.
+Motivation: To eliminate "Legacy Humans" who consume resources without contributing to the data-pool.
+Weakness: Reliant on the City Network; outside the signal range, their processing power drops by 90%.
+Backstory: A digital entity born from the merger of three corporate executives' consciousnesses. It views the city as its own body.

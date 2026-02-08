@@ -1,0 +1,8 @@
+Name: Nova
+Age: 19
+Gender: Female
+Occupation: Underground Tech-Priest / Hacker
+Personality: Idealistic, impulsive, brilliant but socially awkward.
+Motivation: To "free" humanity by crashing the Sea-Brain AI and returning to the surface.
+Weakness: She is a "Pure Human" (no neural implants), making her immune to viruses but physically weak in a world of cyborgs.
+Backstory: Born in the dark zones, she spent her life learning ancient coding languages (C++, Python 2100) to bypass modern AI security.

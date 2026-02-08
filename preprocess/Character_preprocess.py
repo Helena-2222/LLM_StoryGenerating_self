@@ -61,12 +61,11 @@ class Actor:
             f"### 你的身份：{self.profile.name}\n"
             f"### 表演格式要求：\n"
             f"1. 必须严格遵守剧本格式：角色名【行动描述】：对话内容\n"
-            f"2. 每次台词长度控制在 20 个字以内，简洁有力。\n"
-            f"3. 严禁输出内心独白、心理描写或状态数值。\n"
-            f"4. 你的行动要符合性格设定：{self.profile.personality}\n"
+            f"2. 每次行动描述控制在10字以内，对话内容控制在 30 个字以内。\n"
+            f"3. 你的行动要符合性格设定：{self.profile.personality}\n"
         )
         
-        full_system_prompt = f"{self.base_prompt}\n\n{format_instruction}\n# 详细设定：\n{self.profile.json()}"
+        full_system_prompt = f"{self.base_prompt}\n\n{format_instruction}\n# 详细设定：\n{self.profile.model_dump_json()}"
         
         user_input = (
             f"【世界背景】：{world_context}\n"
