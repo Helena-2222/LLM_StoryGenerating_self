@@ -42,47 +42,83 @@ class Actor:
     def __init__(self, llm, profile: CharacterProfile, prompt_path="inputs/prompts/character_actor.txt"):
         self.llm = llm
         self.profile = profile
+        self.memory = []          # 记忆流
+        self.reflections = "处于初始状态，保持原有性格。"  # 缓存的反思内容
+        self.step_count = 0        # 步进计数器
         self.prompt_path = prompt_path
         self.base_prompt = self._load_actor_prompt()
 
     def _load_actor_prompt(self):
-        """从外部文件加载角色行动逻辑模板"""
         if not os.path.exists(self.prompt_path):
-            # 如果文件不存在，给一个基础兜底，防止报错
             return "你正在扮演一个角色，请根据设定进行戏剧化表演。"
         with open(self.prompt_path, "r", encoding="utf-8") as f:
             return f.read()
 
-    # preprocess/Character_preprocess.py 核心修改部分
+    async def _reflect(self, current_observation: str):
+        """
+        内部反思：提炼心态，不向用户输出
+        """
+        # 只取最近的记忆片段进行高层次抽象
+        recent_context = "\n".join(self.memory[-6:]) 
+        reflect_prompt = ChatPromptTemplate.from_template(
+            "你正在扮演 {name}。请根据以下近期经历：\n{memories}\n"
+            "进行一次深度的内心自省。你现在的压力值、信任感和下一步的隐秘打算是什么？\n"
+            "请直接给出心态描述（50字以内），严禁输出剧本格式。"
+        )
+        chain = reflect_prompt | self.llm
+        resp = await chain.ainvoke({
+            "name": self.profile.name,
+            "memories": recent_context + "\n观察：" + current_observation
+        })
+        self.reflections = resp.content.strip()
+        # 重置计数器
+        self.step_count = 0
 
     async def act(self, world_context: str, history: str, director_guidance: str = ""):
-        # 强制要求剧本格式和字数控制
+        # 1. 更新观察并累加步数
+        observation = history.strip().split('\n')[-2:] if history else []
+        current_obs = " | ".join(observation)
+        self.step_count += 1
+
+        # 2. 每 3 轮执行一次“慢思考”反思，平时只用缓存
+        if self.step_count >= 3:
+            print(f"🧠 [{self.profile.name}] 正在进行深度反思...") # 调试用，实际运行可关闭
+            await self._reflect(current_obs)
+
+        # 3. 构造表演指令（反思内容作为背景，不要求 AI 输出反思过程）
         format_instruction = (
             f"### 你的身份：{self.profile.name}\n"
+            f"### 当前心态（仅供参考，不要输出）：{self.reflections}\n"
             f"### 表演格式要求：\n"
-            f"1. 必须严格遵守剧本格式：角色名【行动描述】：对话内容\n"
-            f"2. 每次行动描述控制在10字以内，对话内容控制在 30 个字以内。\n"
-            f"3. 你的行动要符合性格设定：{self.profile.personality}\n"
+            f"1. 严格使用格式：角色名【行动描述】：对话内容\n"
+            f"2. 行动描述 < 10字，台词 < 30字。\n"
+            f"3. 你的台词和行动必须体现你当下的心态变化。\n"
         )
         
-        full_system_prompt = f"{self.base_prompt}\n\n{format_instruction}\n# 详细设定：\n{self.profile.model_dump_json()}"
+        full_system_prompt = f"{self.base_prompt}\n\n{format_instruction}\n# 核心设定：\n{self.profile.model_dump_json()}"
         
         user_input = (
-            f"【世界背景】：{world_context}\n"
-            f"【前情提要/已发生的对话】：\n{history}\n"
-            f"请根据以上信息，接续写下 {self.profile.name} 的一次行动和一句台词："
+            f"【环境】：{world_context}\n"
+            f"【前情】：{history}\n"
+            f"请接续：{self.profile.name}【...】：..."
         )
         
         if director_guidance:
-            user_input += f"\n【导演指令】：{director_guidance}"
+            user_input += f"\n【注意】：{director_guidance}"
 
         messages = [
             {"role": "system", "content": full_system_prompt},
             {"role": "user", "content": user_input}
         ]
         
-        return await self.llm.ainvoke(messages)
+        response = await self.llm.ainvoke(messages)
+        content = response.content.strip()
 
+        # 4. 将自己的表现存入记忆
+        self.memory.append(content)
+        
+        return response
+    
 # S1 & S2. 读取并补全角色信息逻辑
 def preprocess_character(raw_text: str, llm):
     parser = PydanticOutputParser(pydantic_object=CharacterProfile)
