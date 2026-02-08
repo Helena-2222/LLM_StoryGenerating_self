@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
 # 导入自定义模块
-from preprocess.Character_preprocess import preprocess_character, Actor
+from preprocess.Character_preprocess import preprocess_character, Actor, CharacterProfile
 from preprocess.WorldView_preprocess import preprocess_worldview
 from revise.director import Director
 from outputs.FinalOutput.FinalOutput import save_final_script
@@ -29,10 +29,7 @@ from outputs.FinalOutput.FinalOutput import save_final_script
 load_dotenv()
 
 async def get_speaker_scores(llm, actors, world_context, current_history):
-    """
-    【决策中心】：动态评估角色发言优先级。
-    指标：1.短期状态 2.动机 3.性格 4.时机 (各1.0分)
-    """
+    """【决策中心】：动态评估角色发言优先级"""
     actor_info = "\n".join([f"- {a.profile.name}: {a.profile.personality} (目标: {a.profile.motivation})" for a in actors])
     
     score_prompt = (
@@ -40,18 +37,13 @@ async def get_speaker_scores(llm, actors, world_context, current_history):
         f"【角色设定】：\n{actor_info}\n"
         f"【环境】：{world_context}\n"
         f"【近期剧情】：\n{current_history[-600:]}\n\n"
-        "请为每个角色在以下四项指标（0.0-1.0）打分：\n"
-        "1. 状态(State): 情绪波动程度。\n"
-        "2. 动机(Motivation): 当前话题与目标的关联度。\n"
-        "3. 性格(Personality): 外向/急躁者得分高。\n"
-        "4. 时机(Timing): 环境是否利于其介入。\n\n"
+        "请为每个角色打分（0.0-1.0）：1.状态 2.动机 3.性格 4.时机。\n"
         "请严格按此JSON格式输出：\n"
         '{"角色名": {"total_score": 综合分, "reason": "简述原因"}}'
     )
 
     try:
         response = await llm.ainvoke(score_prompt)
-        # 提取JSON块
         text = response.content
         json_str = text[text.find("{"):text.rfind("}")+1]
         return json.loads(json_str)
@@ -68,38 +60,92 @@ async def main():
         temperature=0.7
     )
 
-    # 2. 预处理世界观
-    print("\n🌍 正在初始化世界观设定...")
-    with open("inputs/Rebirth/WorldViewSetting.txt", "r", encoding="utf-8") as f:
-        world_data = preprocess_worldview(f.read(), llm)
+    # --- 存档路径设置 ---
+    story_id = "Rebirth"
+    session_dir = f"sessions/{story_id}"
+    char_cache_dir = f"{session_dir}/characters_cache"
+    os.makedirs(char_cache_dir, exist_ok=True)
     
-    # 3. 加载角色（保持实例，以维持记忆流）
+    world_cache_path = f"{session_dir}/worldview_cache.json"
+    history_state_path = f"{session_dir}/history_state.txt"
+
+    # 2. 预处理世界观 (增加空文件校验)
+    world_cache_path = f"{session_dir}/worldview_cache.json"
+    world_data = None
+
+    if os.path.exists(world_cache_path) and os.path.getsize(world_cache_path) > 0:
+        print("\n♻️ 发现世界观缓存，正在秒级加载...")
+        try:
+            with open(world_cache_path, "r", encoding="utf-8") as f:
+                world_data = json.load(f)
+        except json.JSONDecodeError:
+            print("⚠️ 缓存文件损坏，准备重新生成...")
+
+    if not world_data:
+        print("\n🌍 正在初始化世界观设定...")
+        with open(f"inputs/{story_id}/WorldViewSetting.txt", "r", encoding="utf-8") as f:
+            world_data = preprocess_worldview(f.read(), llm)
+            # 写入缓存
+            with open(world_cache_path, "w", encoding="utf-8") as f:
+                content = world_data.model_dump_json() if hasattr(world_data, 'model_dump_json') else json.dumps(world_data)
+                f.write(content)
+
+    # 3. 加载角色 (带缓存校验逻辑)
     print("\n👥 正在唤醒角色灵魂...")
     actors = []
-    char_dir = "inputs/Rebirth/characters"
-    for filename in sorted(os.listdir(char_dir)):
+    char_input_dir = f"inputs/{story_id}/characters"
+    
+    for filename in sorted(os.listdir(char_input_dir)):
         if filename.endswith(".txt"):
-            with open(os.path.join(char_dir, filename), "r", encoding="utf-8") as f:
-                profile = preprocess_character(f.read(), llm)
-                actors.append(Actor(llm, profile))
+            char_name = filename.replace(".txt", "")
+            cache_path = f"{char_cache_dir}/{char_name}_profile.json"
+            profile = None
+            
+            # 只有当文件存在且大小大于 0 时才尝试加载
+            if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+                try:
+                    with open(cache_path, "r", encoding="utf-8") as f:
+                        profile_data = json.load(f)
+                        profile = CharacterProfile(**profile_data)
+                    print(f"  - 角色 [{char_name}] 加载自缓存存档")
+                except (json.JSONDecodeError, Exception) as e:
+                    print(f"  - 角色 [{char_name}] 缓存损坏，准备重新生成...")
 
-    if not actors:
-        print("❌ 未检测到有效角色设定，程序退出。")
-        return
+            # 如果没加载成功，则重新预处理
+            if profile is None:
+                print(f"  - 角色 [{char_name}] 正在进行初始 AI 补全...")
+                with open(os.path.join(char_input_dir, filename), "r", encoding="utf-8") as f:
+                    profile = preprocess_character(f.read(), llm)
+                    # 写入缓存
+                    with open(cache_path, "w", encoding="utf-8") as f:
+                        f.write(profile.model_dump_json())
+            
+            actors.append(Actor(llm, profile))
 
-    # 4. 初始化配置
+    # 4. 初始化历史与标题
     director = Director(llm)
-    with open("inputs/Rebirth/HistorySetting.txt", "r", encoding="utf-8") as f:
-        history = f.read()
-    with open("inputs/Rebirth/SeriesTitle.txt", "r", encoding="utf-8") as f:
-        title = f.read()
+    with open(f"inputs/{story_id}/SeriesTitle.txt", "r", encoding="utf-8") as f:
+        title = f.read().strip()
 
-    max_ep = 3
+    # 断点续传逻辑
+    if os.path.exists(history_state_path):
+        with open(history_state_path, "r", encoding="utf-8") as f:
+            history = f.read()
+        # 通过计算历史记录中的标记，确定起始集数
+        completed_eps = history.count("--- 第") 
+        start_ep = completed_eps + 1
+        print(f"🎬 检测到历史存档，将从第 {start_ep} 集开始接龙...")
+    else:
+        with open(f"inputs/{story_id}/HistorySetting.txt", "r", encoding="utf-8") as f:
+            history = f.read()
+        start_ep = 1
+
+    max_ep = 6
     target_length = 800
     max_retries = 1
 
     # 5. 创作大循环
-    for episode_num in range(1, max_ep + 1):
+    for episode_num in range(start_ep, max_ep + 1):
         print(f"\n{'='*20} 🎬 第 {episode_num} 集 创作开始 {'='*20}")
         
         success = False
@@ -108,31 +154,19 @@ async def main():
         
         while not success and retry_count < max_retries:
             episode_script = ""
-            consecutive_count = {a.profile.name: 0 for a in actors} # 记录连击数
+            consecutive_count = {a.profile.name: 0 for a in actors}
             
-            print(f"📡 导演正在根据剧情流分配表演权 (尝试 {retry_count + 1})...")
+            print(f"📡 导演正在决策发言权 (尝试 {retry_count + 1})...")
 
             while len(episode_script) < target_length:
-                # 动态获取当前谁该说话
                 scores = await get_speaker_scores(llm, actors, str(world_data), history + "\n" + episode_script)
-                
-                # 排序逻辑：得分高者优先
-                if scores:
-                    sorted_actors = sorted(
-                        actors, 
-                        key=lambda a: scores.get(a.profile.name, {}).get('total_score', 0), 
-                        reverse=True
-                    )
-                else:
-                    sorted_actors = actors
+                sorted_actors = sorted(actors, key=lambda a: scores.get(a.profile.name, {}).get('total_score', 0), reverse=True) if scores else actors
 
-                # 选角：如果得分第一的角色已经“连击”超过2次，且还有其他人选，则换人
                 current_actor = sorted_actors[0]
                 if consecutive_count[current_actor.profile.name] >= 2 and len(sorted_actors) > 1:
                     current_actor = sorted_actors[1]
 
-                # 角色表演
-                print(f"🎤 [{current_actor.profile.name}] 获得发言权 (当前集长度: {len(episode_script)})")
+                print(f"🎤 [{current_actor.profile.name}] 获得发言权 (长度: {len(episode_script)})")
                 action_resp = await current_actor.act(
                     world_context=str(world_data),
                     history=history + "\n" + episode_script,
@@ -142,18 +176,14 @@ async def main():
                 content = action_resp.content.strip()
                 episode_script += content + "\n\n"
 
-                # 更新连击计数
                 for name in consecutive_count:
-                    if name == current_actor.profile.name:
-                        consecutive_count[name] += 1
-                    else:
-                        consecutive_count[name] = 0
+                    consecutive_count[name] = consecutive_count[name] + 1 if name == current_actor.profile.name else 0
 
                 if len(episode_script) >= target_length:
                     break
 
             # 导演审核
-            print(f"🧐 表演结束，导演正在审片...")
+            print(f"🧐 正在审片...")
             review_result = await director.review(episode_script, episode_num)
             
             if "PASS" in review_result.upper():
@@ -164,22 +194,20 @@ async def main():
             else:
                 retry_count += 1
                 current_guidance = review_result
-                print(f"❌ 导演拒绝签收，重试理由: {review_result[:60]}...")
+                print(f"❌ 导演拒绝: {review_result[:60]}...")
 
+        # 兜底：若重试耗尽，强制出片
         if not success:
-            print(f"⚠️ 第 {episode_num} 集重试次数已耗尽。")
-            print(f"🎬 [强制出片]: 导演虽然不完全满意，但为了进度，我们决定采用最后一次生成的版本。")
-            
-            # 即使导演没给 PASS，我们也强制保存最后一次的结果
+            print(f"⚠️ 第 {episode_num} 集重试耗尽，强制采用最后版本。")
             save_final_script(episode_num, episode_script, title)
-            
-            # 同时也必须更新历史，否则下一集会失去上下文
             history += f"\n--- 第 {episode_num} 集剧情回顾 (强行通过) ---\n{episode_script}"
-            
-            # 设置为 True 以便顺利进入下一集
             success = True
 
-    print("\n🏁 剧本创作任务圆满完成！所有文件已按时间戳分类保存。")
+        # 每集结束，实时同步历史到 sessions 目录
+        with open(history_state_path, "w", encoding="utf-8") as f:
+            f.write(history)
+
+    print("\n🏁 剧本创作任务完成！缓存已更新，历史已存入 sessions 目录。")
 
 if __name__ == "__main__":
     asyncio.run(main())
