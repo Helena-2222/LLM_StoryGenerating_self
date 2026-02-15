@@ -140,7 +140,7 @@ async def main():
             history = f.read()
         start_ep = 1
 
-    max_ep = 6
+    max_ep = 12
     target_length = 800
     max_retries = 1
 

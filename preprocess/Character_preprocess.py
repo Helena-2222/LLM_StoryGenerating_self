@@ -86,6 +86,7 @@ class Actor:
             await self._reflect(current_obs)
 
         # 3. 构造表演指令（反思内容作为背景，不要求 AI 输出反思过程）
+        '''
         format_instruction = (
             f"### 你的身份：{self.profile.name}\n"
             f"### 当前心态（仅供参考，不要输出）：{self.reflections}\n"
@@ -93,7 +94,17 @@ class Actor:
             f"1. 严格使用格式：角色名【行动描述】：对话内容\n"
             f"2. 行动描述 < 10字，台词 < 30字。\n"
             f"3. 你的台词和行动必须体现你当下的心态变化。\n"
-        )
+        )'''
+        
+        format_instruction = (
+        f"### 你的身份：{self.profile.name}\n"
+        f"### 当前心态：{self.reflections}\n"
+        f"### 任务：请以分镜师的视角，输出当前剧情的分镜表格。\n"
+        f"### 格式要求：\n"
+        f"1. 必须使用 Markdown 表格输出。\n"
+        f"2. 表格表头为：镜号 | 景别 | 画面内容 | 运镜 | 台词 | 音效 | 特效\n"
+        f"3. 保持角色性格，台词要短促有力。\n"
+    )
         
         full_system_prompt = f"{self.base_prompt}\n\n{format_instruction}\n# 核心设定：\n{self.profile.model_dump_json()}"
         
