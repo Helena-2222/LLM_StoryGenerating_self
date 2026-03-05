@@ -51,7 +51,7 @@ async def get_speaker_scores(llm, actors, world_context, current_history):
         print(f"⚠️ 评分系统波动，将采用默认顺序。错误: {e}")
         return None
 
-async def main():
+async def main(max_ep = 13, target_length = 800, max_retries = 1):
     # 1. 初始化模型
     llm = ChatOpenAI(
         model='deepseek-chat',
@@ -140,10 +140,6 @@ async def main():
             history = f.read()
         start_ep = 1
 
-    max_ep = 12
-    target_length = 800
-    max_retries = 1
-
     # 5. 创作大循环
     for episode_num in range(start_ep, max_ep + 1):
         print(f"\n{'='*20} 🎬 第 {episode_num} 集 创作开始 {'='*20}")
@@ -208,6 +204,12 @@ async def main():
             f.write(history)
 
     print("\n🏁 剧本创作任务完成！缓存已更新，历史已存入 sessions 目录。")
+    return {
+        "status": "success",
+        "story_id": story_id,
+        "output_path": f"outputs/FinalOutput/Scripts/"
+    }
 
 if __name__ == "__main__":
     asyncio.run(main())
+    
