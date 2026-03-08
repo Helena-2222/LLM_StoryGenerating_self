@@ -51,7 +51,7 @@ async def get_speaker_scores(llm, actors, world_context, current_history):
         print(f"⚠️ 评分系统波动，将采用默认顺序。错误: {e}")
         return None
 
-async def main(max_ep = 4, target_length = 800, max_retries = 1):
+async def main(story_id = "TakeOut", max_ep = 4, target_length = 800, max_retries = 1, worldview_text = None, characters_list = None):
     # 1. 初始化模型
     llm = ChatOpenAI(
         model='deepseek-chat',
@@ -61,7 +61,6 @@ async def main(max_ep = 4, target_length = 800, max_retries = 1):
     )
 
     # --- 存档路径设置 ---
-    story_id = "TakeOut"
     session_dir = f"sessions/{story_id}"
     char_cache_dir = f"{session_dir}/characters_cache"
     os.makedirs(char_cache_dir, exist_ok=True)
@@ -169,16 +168,16 @@ async def main(max_ep = 4, target_length = 800, max_retries = 1):
                 # 3. 挑选发言人：防止同一人连续发言超过 1 次
                 current_actor = sorted_actors[0]
                 
-                # 如果第一名已经是麦霸（连续发言 >= 1 次），则看第二名
-                if consecutive_count[current_actor.profile.name] >= 1:
+                # 如果第一名已经是麦霸（连续发言 >= 2 次），则看第二名
+                if consecutive_count[current_actor.profile.name] >= 2:
                     if len(sorted_actors) > 1:
                         # 交给次高分
                         current_actor = sorted_actors[1]
                         # 特殊情况：如果第二名也是麦霸（通常不可能，除非只有2人），则看第三名
-                        if consecutive_count[current_actor.profile.name] >= 1 and len(sorted_actors) > 2:
+                        if consecutive_count[current_actor.profile.name] >= 2 and len(sorted_actors) > 2:
                             current_actor = sorted_actors[2]
                     
-                    print(f"🚫 [麦霸预警] {sorted_actors[0].profile.name} 已连说1次，强制切换至 {current_actor.profile.name}")
+                    print(f"🚫 [麦霸预警] {sorted_actors[0].profile.name} 已连说2次，强制切换至 {current_actor.profile.name}")
 
                 # 4. 执行发言
                 print(f"🎤 [{current_actor.profile.name}] 获得发言权 (长度: {len(episode_script)})")
