@@ -104,6 +104,7 @@ class Actor:
         f"1. 必须使用 Markdown 表格输出。\n"
         f"2. 表格表头为：镜号 | 景别 | 画面内容 | 运镜 | 台词 | 音效 | 特效\n"
         f"3. 保持角色性格，台词要短促有力。\n"
+        f"4. 只生成当前的一个分镜表格行，不要写后面的剧情。\n"
     )
         
         full_system_prompt = f"{self.base_prompt}\n\n{format_instruction}\n# 核心设定：\n{self.profile.model_dump_json()}"

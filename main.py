@@ -51,7 +51,7 @@ async def get_speaker_scores(llm, actors, world_context, current_history):
         print(f"⚠️ 评分系统波动，将采用默认顺序。错误: {e}")
         return None
 
-async def main(max_ep = 13, target_length = 800, max_retries = 1):
+async def main(max_ep = 4, target_length = 800, max_retries = 1):
     # 1. 初始化模型
     llm = ChatOpenAI(
         model='deepseek-chat',
@@ -61,7 +61,7 @@ async def main(max_ep = 13, target_length = 800, max_retries = 1):
     )
 
     # --- 存档路径设置 ---
-    story_id = "Rebirth"
+    story_id = "TakeOut"
     session_dir = f"sessions/{story_id}"
     char_cache_dir = f"{session_dir}/characters_cache"
     os.makedirs(char_cache_dir, exist_ok=True)
@@ -154,14 +154,33 @@ async def main(max_ep = 13, target_length = 800, max_retries = 1):
             
             print(f"📡 导演正在决策发言权 (尝试 {retry_count + 1})...")
 
+            # --- 角色决策与麦霸控制开始 ---
             while len(episode_script) < target_length:
+                # 1. 获取 AI 评分
                 scores = await get_speaker_scores(llm, actors, str(world_data), history + "\n" + episode_script)
-                sorted_actors = sorted(actors, key=lambda a: scores.get(a.profile.name, {}).get('total_score', 0), reverse=True) if scores else actors
+                
+                # 2. 按分数从高到低排序所有角色
+                # 这里的 sorted_actors 是一个列表，[0]是第一名，[1]是第二名，以此类推
+                if scores:
+                    sorted_actors = sorted(actors, key=lambda a: scores.get(a.profile.name, {}).get('total_score', 0), reverse=True)
+                else:
+                    sorted_actors = actors # 兜底逻辑
 
+                # 3. 挑选发言人：防止同一人连续发言超过 1 次
                 current_actor = sorted_actors[0]
-                if consecutive_count[current_actor.profile.name] >= 2 and len(sorted_actors) > 1:
-                    current_actor = sorted_actors[1]
+                
+                # 如果第一名已经是麦霸（连续发言 >= 1 次），则看第二名
+                if consecutive_count[current_actor.profile.name] >= 1:
+                    if len(sorted_actors) > 1:
+                        # 交给次高分
+                        current_actor = sorted_actors[1]
+                        # 特殊情况：如果第二名也是麦霸（通常不可能，除非只有2人），则看第三名
+                        if consecutive_count[current_actor.profile.name] >= 1 and len(sorted_actors) > 2:
+                            current_actor = sorted_actors[2]
+                    
+                    print(f"🚫 [麦霸预警] {sorted_actors[0].profile.name} 已连说1次，强制切换至 {current_actor.profile.name}")
 
+                # 4. 执行发言
                 print(f"🎤 [{current_actor.profile.name}] 获得发言权 (长度: {len(episode_script)})")
                 action_resp = await current_actor.act(
                     world_context=str(world_data),
@@ -169,14 +188,17 @@ async def main(max_ep = 13, target_length = 800, max_retries = 1):
                     director_guidance=current_guidance
                 )
                 
+                # 5. 更新内容与统计
                 content = action_resp.content.strip()
                 episode_script += content + "\n\n"
 
+                # 关键：更新所有角色的连续发言计数
                 for name in consecutive_count:
-                    consecutive_count[name] = consecutive_count[name] + 1 if name == current_actor.profile.name else 0
-
-                if len(episode_script) >= target_length:
-                    break
+                    if name == current_actor.profile.name:
+                        consecutive_count[name] += 1  # 选中的人 +1
+                    else:
+                        consecutive_count[name] = 0   # 没选中的人 归零重置
+            # --- 角色决策逻辑结束 ---
 
             # 导演审核
             print(f"🧐 正在审片...")
@@ -184,7 +206,7 @@ async def main(max_ep = 13, target_length = 800, max_retries = 1):
             
             if "PASS" in review_result.upper():
                 print(f"✨ 审核通过！")
-                save_final_script(episode_num, episode_script, title)
+                save_final_script(episode_num, episode_script, title, story_id)
                 history += f"\n--- 第 {episode_num} 集剧情回顾 ---\n{episode_script}"
                 success = True
             else:
@@ -195,7 +217,7 @@ async def main(max_ep = 13, target_length = 800, max_retries = 1):
         # 兜底：若重试耗尽，强制出片
         if not success:
             print(f"⚠️ 第 {episode_num} 集重试耗尽，强制采用最后版本。")
-            save_final_script(episode_num, episode_script, title)
+            save_final_script(episode_num, episode_script, title,story_id)
             history += f"\n--- 第 {episode_num} 集剧情回顾 (强行通过) ---\n{episode_script}"
             success = True
 
@@ -207,7 +229,7 @@ async def main(max_ep = 13, target_length = 800, max_retries = 1):
     return {
         "status": "success",
         "story_id": story_id,
-        "output_path": f"outputs/FinalOutput/Scripts/"
+        "output_path": f"outputs/FinalOutput/Scripts/{story_id}"
     }
 
 if __name__ == "__main__":
