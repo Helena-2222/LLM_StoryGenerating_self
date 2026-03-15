@@ -25,7 +25,7 @@ from preprocess.Character_preprocess import preprocess_character, Actor, Charact
 from preprocess.WorldView_preprocess import preprocess_worldview
 from revise.director import Director
 from outputs.FinalOutput.FinalOutput import save_final_script
-
+from outputs.PhaseOutput.PhaseOutput import PhaseOutput
 load_dotenv()
 
 async def get_speaker_scores(llm, actors, world_context, current_history):
@@ -51,7 +51,7 @@ async def get_speaker_scores(llm, actors, world_context, current_history):
         print(f"⚠️ 评分系统波动，将采用默认顺序。错误: {e}")
         return None
 
-async def main(story_id = "TakeOut", max_ep = 4, target_length = 800, max_retries = 1, worldview_text = None, characters_list = None):
+async def main(story_id = "TakeOut", max_ep = 8, target_length = 800, max_retries = 1, worldview_text = None, characters_list = None):
     # 1. 初始化模型
     llm = ChatOpenAI(
         model='deepseek-chat',
@@ -205,9 +205,31 @@ async def main(story_id = "TakeOut", max_ep = 4, target_length = 800, max_retrie
             
             if "PASS" in review_result.upper():
                 print(f"✨ 审核通过！")
-                save_final_script(episode_num, episode_script, title, story_id)
-                history += f"\n--- 第 {episode_num} 集剧情回顾 ---\n{episode_script}"
-                success = True
+                
+                # 显示内容给用户
+                PhaseOutput.show_episode_preview(
+                    episode_num=episode_num,
+                    title=title,
+                    content=episode_script,
+                    director_review=review_result
+                )
+                #用户判断
+                user_choice = input(f"❓ 您对第 {episode_num} 集满意吗？(通过[Y] / 重写[N]): ").strip().upper()
+                while(1):
+                    if user_choice == 'Y':
+                        print(f"✨ 确认通过！正在同步存档...")
+                        save_final_script(episode_num, episode_script, title, story_id)
+                        history += f"\n--- 第 {episode_num} 集剧情回顾 ---\n{episode_script}"
+                        success = True
+                        break
+                    elif user_choice == 'N':
+                        feedback = input("💬 输入修改建议 (直接回车则采用AI导演意见): ").strip()
+                        current_guidance = feedback if feedback else review_result
+                        print(f"🔄 收到反馈，正在推倒重写第 {episode_num} 集...")
+                        break
+                    else:
+                        print("❌ 请输入 'Y' 或 'N' ")
+
             else:
                 retry_count += 1
                 current_guidance = review_result

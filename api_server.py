@@ -29,7 +29,6 @@ async def run_wrapper(task_id: str, request: StoryRequest):
             story_id=request.story_id,
             max_ep=int(request.max_ep),
             target_length=int(request.target_length),
-            max_retries = 1,
             worldview_text=request.worldview_text,
             characters_list=request.characters_list
         )

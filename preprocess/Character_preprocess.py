@@ -80,10 +80,10 @@ class Actor:
         current_obs = " | ".join(observation)
         self.step_count += 1
 
-        # 2. 每 3 轮执行一次“慢思考”反思，平时只用缓存
-        if self.step_count >= 3:
-            print(f"🧠 [{self.profile.name}] 正在进行深度反思...") # 调试用，实际运行可关闭
-            await self._reflect(current_obs)
+        # 2. 每 10 轮执行一次“慢思考”反思，平时只用缓存
+        #if self.step_count >= 10:
+            #print(f"🧠 [{self.profile.name}] 正在进行深度反思...") # 调试用，实际运行可关闭
+            #await self._reflect(current_obs)
 
         # 3. 构造表演指令（反思内容作为背景，不要求 AI 输出反思过程）
         '''
