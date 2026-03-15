@@ -51,7 +51,7 @@ async def get_speaker_scores(llm, actors, world_context, current_history):
         print(f"⚠️ 评分系统波动，将采用默认顺序。错误: {e}")
         return None
 
-async def main(story_id = "TakeOut", max_ep = 8, target_length = 800, max_retries = 1, worldview_text = None, characters_list = None):
+async def main(story_id = "TakeOut", max_ep = 2, target_length = 800, max_retries = 2, worldview_text = None, characters_list = None):
     # 1. 初始化模型
     llm = ChatOpenAI(
         model='deepseek-chat',

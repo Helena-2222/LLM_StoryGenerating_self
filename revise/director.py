@@ -17,7 +17,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 import os
 
 class Director:
-    def __init__(self, llm, prompt_path="inputs/prompts/director_system.txt"):
+    def __init__(self, llm, prompt_path="inputs/prompts/director_system_playlet.txt"):
         self.llm = llm
         # 动态加载 Prompt 文件
         self.system_prompt = self._load_prompt(prompt_path)
